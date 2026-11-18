@@ -1,0 +1,1 @@
+"C:\Program Files\GNU Octave\Octave-11.3.0\octave-launch.exe" --no-gui
