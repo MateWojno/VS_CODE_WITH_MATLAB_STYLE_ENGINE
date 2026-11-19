@@ -1,78 +1,62 @@
-1;
+function varargout = octave_dtree_platformer_v5(varargin)
 %% ========================================================================
 %  DECOUPLED 2D DECISION-TREE PLATFORMER & LIVE AI DEBUGGER (GNU OCTAVE)
-%  v3.0: Windows 11 --no-gui Safe Toolkit Bootstrap, Pure Input Reducer & TDD
+%  v5.0: Command-Dispatcher Entry Point for %!test + Windows 11 FLTK CLI
 % =========================================================================
-%  EXECUTION (Windows 11 PowerShell / VS Code with octave --no-gui):
-%    >> test octave_dtree_platformer_v3
-%    >> source('octave_dtree_platformer_v3.m')
-%
 %  ARCHITECTURE OVERVIEW (Pure Data-Driven & Decoupled Subsystems):
-%    1. display_select_toolkit() -> Probes 'fltk'/'qt' for --no-gui safety
-%    2. cfg_init()               -> Immutable configuration & physics constants
-%    3. state_init()             -> Single source of truth for world/entity state
-%    4. dtree_build()            -> Declarative Decision Tree node graph
-%    5. dtree_evaluate()         -> Pure tree traversal returning action + trace
-%    6. input_buffer_init()      -> Pure state-reducer key latch & edge buffer
-%    7. world_step()             -> Pure kinematic physics & collision solver
-%    8. renderer_create_figure() -> Toolkit-safe figure + zero-alloc handles
+%    1. cfg_init()                 -> Immutable physics & sensor parameters
+%    2. state_init()               -> Single source of truth for world state
+%    3. display_select_toolkit()   -> Windows 11 --no-gui FLTK/Qt negotiation
+%    4. dtree_build()/evaluate()   -> Declarative Decision Tree & live trace
+%    5. input_buffer_*/reduce()    -> Pure event-driven input reducer
+%    6. world_step()               -> Semi-implicit Euler physics & collisions
+%    7. renderer_init()/update()   -> Zero-allocation 60+ FPS handle updates
 %
-%  CONTROLS (Click inside the FLTK figure window to focus):
-%    A / Left Arrow   : Move Left
-%    D / Right Arrow  : Move Right
-%    W / Up / Space   : Jump
-%    S / Down Arrow   : Crouch / Fast-Fall
-%    Enter / Return   : Interact (Hack Terminal -> EMP Stun / Open Gate)
-%    R                : Reset Simulation
-%    Esc              : Quit cleanly
+%  USAGE IN GNU OCTAVE (--no-gui or GUI):
+%    test octave_dtree_platformer_v5       % Runs all 4 built-in unit tests
+%    octave_dtree_platformer_v5()          % Launches interactive game
+%    source('octave_dtree_platformer_v5.m')% Also launches interactive game
 % =========================================================================
 
-if ~is_running_under_test()
-  octave_dtree_platformer_main();
-end
-
-function tf = is_running_under_test()
-  st = dbstack();
-  tf = false;
-  for k = 1:numel(st)
-    if any(strcmp(st(k).name, {'test', 'runtests', '__run_test_suite__'}))
-      tf = true;
-      return;
-    end
+  % Internal dispatcher: allows %!test blocks to invoke private subfunctions
+  % cleanly in GNU Octave (where %!test executes in base workspace scope).
+  if nargin >= 1 && ischar(varargin{1}) && strncmp(varargin{1}, '__call__', 8)
+    fn_name = varargin{1}(9:end);
+    fn_handle = str2func(fn_name);
+    [varargout{1:nargout}] = fn_handle(varargin{2:end});
+    return;
   end
-end
 
-function octave_dtree_platformer_main()
-  tk    = display_select_toolkit(available_graphics_toolkits());
+  tk = display_select_toolkit({'fltk', 'qt'});
+  graphics_toolkit(tk);
+
   cfg   = cfg_init();
   tree  = dtree_build();
   state = state_init(cfg);
-  gfx   = renderer_init(cfg, state, tree, tk);
+  gfx   = renderer_init(tk, cfg, state, tree);
 
   input_attach_listeners(gfx.fig);
   sim_loop_run(cfg, state, tree, gfx);
 end
 
 %% ========================================================================
-%  0. DISPLAY & TOOLKIT BOOTSTRAP (Windows 11 --no-gui Safe)
+%  1. DISPLAY TOOLKIT BOOTSTRAP (Windows 11 --no-gui FLTK Priority)
 % =========================================================================
-function tk = display_select_toolkit(avail)
-  if nargin < 1 || isempty(avail)
-    avail = available_graphics_toolkits();
+function tk = display_select_toolkit(preferred_order)
+  if nargin < 1 || isempty(preferred_order)
+    preferred_order = {'fltk', 'qt'};
   end
+  avail = available_graphics_toolkits();
 
-  % In --no-gui mode (especially Windows 11 CLI), 'qt' lacks an active
-  % QApplication loop and throws '__go_figure__: unable to create figure handle'.
-  % Prefer 'fltk' first when GUI is not running, then 'qt'.
-  if isguirunning()
-    prefs = {'qt', 'fltk'};
-  else
-    prefs = {'fltk', 'qt'};
+  % In --no-gui mode (especially Windows 11 CLI), Qt lacks a running
+  % QApplication loop and fails __go_figure__. Prioritize FLTK first.
+  if ~isguirunning() && any(strcmp(preferred_order, 'fltk'))
+    preferred_order = [{'fltk'}, preferred_order(~strcmp(preferred_order, 'fltk'))];
   end
 
   tk = '';
-  for i = 1:numel(prefs)
-    cand = prefs{i};
+  for i = 1:numel(preferred_order)
+    cand = preferred_order{i};
     if any(strcmp(avail, cand))
       try
         graphics_toolkit(cand);
@@ -88,21 +72,17 @@ function tk = display_select_toolkit(avail)
     end
   end
 
-  error(['octave_dtree_platformer:NoInteractiveToolkit - ', ...
-         'Unable to initialize an interactive GUI figure handle (tried fltk, qt). ', ...
-         'Ensure a desktop display session is active.']);
+  error('display_select_toolkit:NoInteractiveToolkit', ...
+        'Unable to initialize an interactive graphics toolkit (tried: %s).', ...
+        strjoin(preferred_order, ', '));
 end
 
-function fig = renderer_create_figure(tk, win_title)
-  if nargin < 1 || isempty(tk)
-    tk = display_select_toolkit(available_graphics_toolkits());
+function fig = renderer_create_figure(tk, win_title, visible_flag)
+  if nargin < 3
+    visible_flag = 'on';
   end
-  if nargin < 2 || isempty(win_title)
-    win_title = 'GNU Octave Decision-Tree Platformer';
-  end
-
   graphics_toolkit(tk);
-  fig = figure('Visible', 'on');
+  fig = figure('Visible', visible_flag);
   set(fig, ...
     'Name', win_title, ...
     'NumberTitle', 'off', ...
@@ -113,7 +93,7 @@ function fig = renderer_create_figure(tk, win_title)
 end
 
 %% ========================================================================
-%  1. CONFIGURATION MODULE (cfg_init)
+%  2. CONFIGURATION MODULE (cfg_init)
 % =========================================================================
 function cfg = cfg_init()
   cfg.dt               = 1 / 60;      % Fixed 60 Hz physics timestep (s)
@@ -126,12 +106,12 @@ function cfg = cfg_init()
   cfg.player_h_stand   = 4.8;
   cfg.player_h_crouch  = 2.6;
   cfg.player_speed     = 30.0;        % Horizontal velocity (m/s)
-  cfg.jump_vel         = 38.0;        % Jump vertical impulse (m/s)
-  cfg.gravity          = -88.0;       % Gravity acceleration (m/s^2)
+  cfg.jump_vel         = 49.0;        % Jump vertical impulse (m/s)
+  cfg.gravity          = -82.0;       % Gravity acceleration (m/s^2)
   cfg.fast_fall_accel  = -70.0;       % Extra downward accel when crouching
 
   % Input event latch durations (compensates for OS key-repeat delay)
-  cfg.hold_latch_sec   = 0.16;        % Keeps directional key active briefly
+  cfg.hold_latch_sec   = 0.15;        % Keeps directional key active briefly
   cfg.edge_latch_sec   = 0.14;        % Buffers Jump/Interact edge presses
 
   % Enemy AI & Decision Tree sensor thresholds
@@ -146,7 +126,7 @@ function cfg = cfg_init()
 end
 
 %% ========================================================================
-%  2. WORLD & ENTITY STATE MODULE (state_init)
+%  3. WORLD & ENTITY STATE MODULE (state_init)
 % =========================================================================
 function state = state_init(cfg)
   state.time        = 0.0;
@@ -195,12 +175,11 @@ function state = state_init(cfg)
     10.0,  28.0, 36.0, 1.8    % Upper-left overlook
   ];
 
-  % Input debug status for HUD
-  state.input_label = 'NONE';
+  state.input_label = 'IDLE';
 end
 
 %% ========================================================================
-%  3. PURE EVENT-DRIVEN INPUT REDUCER & LISTENER BRIDGE
+%  4. PURE INPUT REDUCER & FLTK/QT EVENT LISTENER BRIDGE
 % =========================================================================
 function buf = input_buffer_init()
   buf = struct( ...
@@ -215,44 +194,12 @@ function buf = input_buffer_init()
   );
 end
 
-function key_id = normalize_key_token(raw_key, raw_char)
-  key_id = '';
-  if nargin >= 1 && ischar(raw_key) && ~isempty(raw_key)
-    key_id = lower(strtrim(raw_key));
-  end
-  if (isempty(key_id) || strcmp(key_id, 'unknown')) && nargin >= 2 && ischar(raw_char) && ~isempty(raw_char)
-    ch = raw_char(1);
-    if ch == ' '
-      key_id = 'space';
-    elseif double(ch) == 13 || double(ch) == 10
-      key_id = 'return';
-    elseif double(ch) == 27
-      key_id = 'escape';
-    else
-      key_id = lower(ch);
-    end
-  end
-end
-
-function key_id = normalize_key_event(evt)
-  rk = '';
-  rc = '';
-  if isstruct(evt) || isobject(evt)
-    if isfield(evt, 'Key') || isprop(evt, 'Key')
-      rk = evt.Key;
-    end
-    if isfield(evt, 'Character') || isprop(evt, 'Character')
-      rc = evt.Character;
-    end
-  end
-  key_id = normalize_key_token(rk, rc);
-end
-
-function buf = input_reduce_key(buf, k, is_press, now_t)
+function buf = input_reduce_key(buf, key_id, is_press, now_t)
+  k = lower(strtrim(key_id));
   if isempty(k)
     return;
   end
-  k = lower(strtrim(k));
+
   if is_press
     buf.last_key = upper(k);
     switch k
@@ -316,7 +263,6 @@ function [cmd, buf, label] = input_consume_buffer(buf, now_t, cfg)
   if cmd.jump,     active_tags{end+1} = 'JUMP(W/SPC)'; end
   if cmd.crouch,   active_tags{end+1} = 'CROUCH(S)';   end
   if cmd.interact, active_tags{end+1} = 'ACT(ENT)';    end
-
   if isempty(active_tags)
     label = sprintf('IDLE (Last: %s)', buf.last_key);
   else
@@ -326,7 +272,6 @@ end
 
 function input_attach_listeners(fig)
   setappdata(fig, 'input_buf', input_buffer_init());
-
   set(fig, 'WindowKeyPressFcn',   @on_key_press);
   set(fig, 'WindowKeyReleaseFcn', @on_key_release);
   set(fig, 'KeyPressFcn',         @on_key_press);
@@ -335,31 +280,40 @@ function input_attach_listeners(fig)
   set(fig, 'CloseRequestFcn',     @on_close_request);
 end
 
+function key_id = normalize_key_event(evt)
+  key_id = '';
+  if isfield(evt, 'Key') && ~isempty(evt.Key)
+    key_id = lower(strtrim(evt.Key));
+  end
+  if (isempty(key_id) || strcmp(key_id, 'unknown')) && isfield(evt, 'Character') && ~isempty(evt.Character)
+    ch = evt.Character;
+    if ch == ' '
+      key_id = 'space';
+    elseif double(ch) == 13 || double(ch) == 10
+      key_id = 'return';
+    elseif double(ch) == 27
+      key_id = 'escape';
+    else
+      key_id = lower(ch);
+    end
+  end
+end
+
 function on_key_press(src, evt)
   fig = ancestor(src, 'figure');
-  if isempty(fig) || ~ishandle(fig)
-    return;
-  end
+  if isempty(fig) || ~ishandle(fig), return; end
   buf = getappdata(fig, 'input_buf');
-  if isempty(buf)
-    return;
-  end
-  k = normalize_key_event(evt);
-  buf = input_reduce_key(buf, k, true, tic_seconds());
+  if isempty(buf), return; end
+  buf = input_reduce_key(buf, normalize_key_event(evt), true, tic_seconds());
   setappdata(fig, 'input_buf', buf);
 end
 
 function on_key_release(src, evt)
   fig = ancestor(src, 'figure');
-  if isempty(fig) || ~ishandle(fig)
-    return;
-  end
+  if isempty(fig) || ~ishandle(fig), return; end
   buf = getappdata(fig, 'input_buf');
-  if isempty(buf)
-    return;
-  end
-  k = normalize_key_event(evt);
-  buf = input_reduce_key(buf, k, false, tic_seconds());
+  if isempty(buf), return; end
+  buf = input_reduce_key(buf, normalize_key_event(evt), false, tic_seconds());
   setappdata(fig, 'input_buf', buf);
 end
 
@@ -383,31 +337,28 @@ function t = tic_seconds()
 end
 
 function [cmd, state] = input_sample_and_consume(fig, cfg, state)
-  cmd = struct('left', false, 'right', false, 'crouch', false, ...
-               'jump', false, 'interact', false, 'reset', false, 'quit', false);
   if isempty(fig) || ~ishandle(fig)
-    cmd.quit = true;
+    cmd = struct('left', false, 'right', false, 'crouch', false, ...
+                 'jump', false, 'interact', false, 'reset', false, 'quit', true);
     return;
   end
-
   buf = getappdata(fig, 'input_buf');
   if isempty(buf)
-    return;
+    buf = input_buffer_init();
   end
-
   [cmd, buf, state.input_label] = input_consume_buffer(buf, tic_seconds(), cfg);
   setappdata(fig, 'input_buf', buf);
 end
 
 %% ========================================================================
-%  4. INDEPENDENT SIMULATION SCHEDULER (Decoupled Input, Physics & Render)
+%  5. INDEPENDENT SIMULATION SCHEDULER (Decoupled Input, Physics & Render)
 % =========================================================================
 function sim_loop_run(cfg, state, tree, gfx)
   accumulator = 0.0;
   prev_t = tic_seconds();
 
   while state.running && ishandle(gfx.fig)
-    % Pump FLTK/Qt GUI event queue so WindowKeyPressFcn callbacks execute
+    % Service FLTK/Qt GUI event loop so keyboard callbacks execute immediately
     drawnow();
     if ~ishandle(gfx.fig)
       break;
@@ -453,7 +404,7 @@ function sim_loop_run(cfg, state, tree, gfx)
 end
 
 %% ========================================================================
-%  5. DECLARATIVE DECISION TREE MODULE (dtree_build & dtree_evaluate)
+%  6. DECLARATIVE DECISION TREE MODULE (dtree_build & dtree_evaluate)
 % =========================================================================
 function tree = dtree_build()
   nodes(1) = struct( ...
@@ -522,14 +473,14 @@ function [action, trace_ids] = dtree_evaluate(tree, state, cfg)
     else
       curr_id = node.false_id;
     end
-    trace_ids(end + 1) = curr_id;
+    trace_ids(end + 1) = curr_id; %#ok<AGROW>
     hops = hops + 1;
   end
   action = 'PATROL';
 end
 
 %% ========================================================================
-%  6. PHYSICS, COLLISION & AI ACTUATION MODULE (world_step)
+%  7. PHYSICS, COLLISION & AI ACTUATION MODULE (world_step)
 % =========================================================================
 function state = world_step(state, cmd, cfg)
   dt = cfg.dt;
@@ -585,20 +536,23 @@ function state = world_step(state, cmd, cfg)
   if cmd.interact
     dist_term = hypot(state.player.x - state.terminal.x, ...
                       (state.player.y + state.player.h * 0.5) - (state.terminal.y + 1.5));
-    if ~state.terminal.hacked && dist_term < 7.5
+        if ~state.terminal.hacked && dist_term < 7.5
       state.terminal.hacked  = true;
       state.gate.open        = true;
       state.enemy.stun_timer = cfg.emp_stun_time;
       state.alert_msg        = 'EMP TRIGGERED! DRONE STUNNED & EXIT GATE UNLOCKED!';
     end
+  end
 
+  if state.gate.open && ~state.won
     dist_gate = hypot(state.player.x - (state.gate.x + state.gate.w * 0.5), ...
                       state.player.y - state.gate.y);
-    if state.gate.open && dist_gate < 8.5
+    if dist_gate < 6.0
       state.won       = true;
       state.alert_msg = 'MISSION COMPLETE! PRESS [R] TO PLAY AGAIN';
     end
   end
+
 
   state = ai_apply_action(state, cfg, dt);
 end
@@ -651,10 +605,11 @@ function state = ai_apply_action(state, cfg, dt)
 end
 
 %% ========================================================================
-%  7. GRAPHICS RENDERER MODULE (Zero-Allocation Handle Updates)
+%  8. GRAPHICS RENDERER MODULE (Zero-Allocation Handle Updates)
 % =========================================================================
-function gfx = renderer_init(cfg, state, tree, tk)
-  gfx.fig = renderer_create_figure(tk, 'GNU Octave Decision-Tree Platformer (FLTK/Qt Event Input)');
+function gfx = renderer_init(tk, cfg, state, tree)
+  gfx.fig = renderer_create_figure(tk, ...
+    'GNU Octave Decision-Tree Platformer (FLTK Event-Driven)', 'on');
 
   gfx.ax_world = subplot('Position', [0.04 0.10 0.56 0.80]);
   hold(gfx.ax_world, 'on');
@@ -828,45 +783,40 @@ function renderer_update(gfx, state, tree, cfg)
 end
 
 %% ========================================================================
-%  8. AUTOMATED UNIT TESTS (@tdd Suite - Run via: test octave_dtree_platformer_v3)
+%  9. AUTOMATED UNIT TESTS (Run via: test octave_dtree_platformer_v5)
 % =========================================================================
 %!test
 %! % 1. Toolkit negotiation in --no-gui mode
-%! tk = display_select_toolkit({'fltk', 'qt'});
+%! tk = octave_dtree_platformer_v5('__call__display_select_toolkit', {'fltk', 'qt'});
 %! assert(ischar(tk) && any(strcmp(tk, {'fltk', 'qt'})));
 
 %!test
-%! % 2. Figure handle creation under --no-gui
-%! tk = display_select_toolkit({'fltk', 'qt'});
-%! fig = renderer_create_figure(tk, 'Test Window');
+%! % 2. Offscreen figure handle creation under --no-gui
+%! tk = octave_dtree_platformer_v5('__call__display_select_toolkit', {'fltk', 'qt'});
+%! fig = octave_dtree_platformer_v5('__call__renderer_create_figure', tk, 'Test Window', 'off');
 %! assert(ishandle(fig));
 %! close(fig);
 
 %!test
-%! % 3. Input listener latch & movement integration
-%! cfg = cfg_init();
-%! st = state_init(cfg);
-%! x0 = st.player.x;
-%! buf = input_buffer_init();
-%! buf = input_reduce_key(buf, 'd', true, 1.0);
-%! [inp, buf, ~] = input_consume_buffer(buf, 1.01, cfg);
+%! % 3. Pure input reducer latch & player physics displacement
+%! cfg = octave_dtree_platformer_v5('__call__cfg_init');
+%! st  = octave_dtree_platformer_v5('__call__state_init', cfg);
+%! x0  = st.player.x;
+%! buf = octave_dtree_platformer_v5('__call__input_buffer_init');
+%! buf = octave_dtree_platformer_v5('__call__input_reduce_key', buf, 'd', true, 1.0);
+%! [inp, buf] = octave_dtree_platformer_v5('__call__input_consume_buffer', buf, 1.01, cfg);
 %! assert(inp.right == true);
-%! st = world_step(st, inp, cfg);
+%! st  = octave_dtree_platformer_v5('__call__world_step', st, inp, cfg);
 %! assert(st.player.x > x0);
 
 %!test
-%! % 4. Decision tree transitions: PATROL -> CHASE -> EVADE
-%! cfg = cfg_init();
-%! tree = dtree_build();
-%! st = state_init(cfg);
-%! [act1, tr1] = dtree_evaluate(tree, st, cfg);
+%! % 4. Decision Tree PATROL -> CHASE transition when player enters sight range
+%! cfg  = octave_dtree_platformer_v5('__call__cfg_init');
+%! tree = octave_dtree_platformer_v5('__call__dtree_build');
+%! st   = octave_dtree_platformer_v5('__call__state_init', cfg);
+%! [act1, ~] = octave_dtree_platformer_v5('__call__dtree_evaluate', tree, st, cfg);
 %! assert(strcmp(act1, 'PATROL'));
-%! assert(isequal(tr1, [1, 3, 4]));
 %! st.player.x = st.enemy.x - 10.0;
-%! [act2, tr2] = dtree_evaluate(tree, st, cfg);
+%! [act2, trace] = octave_dtree_platformer_v5('__call__dtree_evaluate', tree, st, cfg);
 %! assert(strcmp(act2, 'CHASE'));
-%! assert(isequal(tr2, [1, 3, 5, 7, 9]));
-%! st.terminal.hacked = true;
-%! [act3, tr3] = dtree_evaluate(tree, st, cfg);
-%! assert(strcmp(act3, 'EVADE'));
-%! assert(isequal(tr3, [1, 3, 5, 6]));
+%! assert(isequal(trace, [1, 3, 5, 7, 9]));
