@@ -9,12 +9,21 @@ A lightweight, free alternative to MATLAB for academic coursework, numerical com
 <a id="-english-version"></a>
 ## 🇬🇧 English Version
 
+### Table of Contents
+1. [Environment & Prerequisites](#en-1-environment--prerequisites)
+2. [Installation & Setup](#en-2-installation--setup)
+3. [Launching the Octave CLI Engine](#en-3-launching-the-octave-cli-engine)
+4. [Octave CLI Cheat Sheet & Workflow](#en-4-octave-cli-cheat-sheet--workflow)
+5. [MATLAB vs. GNU Octave Compatibility & Porting Guide](#en-5-matlab-vs-gnu-octave-compatibility--porting-guide-example-octave_dtree_platformer_v5m--p6m)
+
+<a id="en-1-environment--prerequisites"></a>
 ### 1. Environment & Prerequisites
 * **Host OS:** Windows 11 Pro (x64)
 * **Editor:** [Visual Studio Code](https://code.visualstudio.com/)
 * **VS Code Extension:** [MATLAB Extension for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=MathWorks.language-matlab) (`MathWorks.language-matlab`) — provides `.m` syntax highlighting, snippets, and code formatting.
 * **Computation Engine:** [GNU Octave](https://octave.org/download#ms-windows) (CLI mode `--no-gui`).
 
+<a id="en-2-installation--setup"></a>
 ### 2. Installation & Setup
 
 #### Step 1: Install GNU Octave
@@ -33,11 +42,13 @@ cd <PROJECT_FOLDER_NAME>
 code .
 ```
 
+<a id="en-3-launching-the-octave-cli-engine"></a>
 ### 3. Launching the Octave CLI Engine
 1. Open the integrated terminal in VS Code using `` Ctrl + ` `` (or `` Ctrl + ~ ``).
 2. Type `octave-cli` (or type `oc` and press `Tab` for PowerShell autocomplete) and press `Enter`.
 3. GNU Octave starts in `--no-gui` mode directly inside your editor workspace.
 
+<a id="en-4-octave-cli-cheat-sheet--workflow"></a>
 ### 4. Octave CLI Cheat Sheet & Workflow
 
 #### Executing `.m` Scripts
@@ -82,6 +93,7 @@ available_graphics_toolkits()
 graphics_toolkit("qt")
 ```
 
+<a id="en-5-matlab-vs-gnu-octave-compatibility--porting-guide-example-octave_dtree_platformer_v5m--p6m"></a>
 ### 5. MATLAB vs. GNU Octave Compatibility & Porting Guide (Example: `octave_dtree_platformer_v5.m` / `p6.m`)
 
 While GNU Octave is largely source-compatible with MATLAB, subtle differences in syntax, graphics backends, and testing frameworks require defensive patterns when writing cross-compatible `.m` files (as demonstrated in `octave_dtree_platformer_v5.m`):
@@ -112,12 +124,21 @@ While GNU Octave is largely source-compatible with MATLAB, subtle differences in
 
 Lekka, darmowa alternatywa dla środowiska MATLAB przeznaczona do nauki, zajęć na studiach oraz obliczeń numerycznych. Łączy edytor **Visual Studio Code** (kolorowanie składni dzięki oficjalnej wtyczce MATLAB) z silnikiem **GNU Octave** uruchamianym w trybie tekstowym (`--no-gui`) bezpośrednio w zintegrowanym terminalu VS Code.
 
+### Spis treści
+1. [Środowisko i wymagania wstępne](#pl-1-srodowisko-i-wymagania-wstepne)
+2. [Instalacja i konfiguracja](#pl-2-instalacja-i-konfiguracja)
+3. [Uruchamianie silnika Octave CLI](#pl-3-uruchamianie-silnika-octave-cli)
+4. [Instrukcja obsługi i ściągawka Octave CLI](#pl-4-instrukcja-obslugi-i-sciagawka-octave-cli)
+5. [Różnice składniowe MATLAB vs. GNU Octave i przenoszenie kodu](#pl-5-roznice-skladniowe-matlab-vs-gnu-octave-i-przenoszenie-kodu-przyklad-octave_dtree_platformer_v5m--p6m)
+
+<a id="pl-1-srodowisko-i-wymagania-wstepne"></a>
 ### 1. Środowisko i wymagania wstępne
 * **System operacyjny:** Windows 11 Pro (x64)
 * **Edytor kodu:** [Visual Studio Code](https://code.visualstudio.com/)
 * **Wtyczka VS Code:** [MATLAB Extension for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=MathWorks.language-matlab) (`MathWorks.language-matlab`) — zapewnia kolorowanie składni plików `.m`, podpowiedzi oraz formatowanie kodu.
 * **Silnik obliczeniowy:** [GNU Octave](https://octave.org/download#ms-windows) (tryb konsolowy `--no-gui`).
 
+<a id="pl-2-instalacja-i-konfiguracja"></a>
 ### 2. Instalacja i konfiguracja
 
 #### Krok 1: Instalacja GNU Octave
@@ -136,11 +157,13 @@ cd <NAZWA_FOLDERU_PROJEKTU>
 code .
 ```
 
+<a id="pl-3-uruchamianie-silnika-octave-cli"></a>
 ### 3. Uruchamianie silnika Octave CLI
 1. Otwórz zintegrowany terminal w Visual Studio Code skrótem `` Ctrl + ` `` (lub `` Ctrl + ~ ``).
 2. Wpisz `octave-cli` (lub wpisz `oc` i naciśnij klawisz `Tab`, aby skorzystać z autouzupełniania PowerShell) i zatwierdź klawiszem `Enter`.
 3. Silnik Octave uruchomi się w trybie `--no-gui` bezpośrednio w katalogu roboczym projektu.
 
+<a id="pl-4-instrukcja-obslugi-i-sciagawka-octave-cli"></a>
 ### 4. Instrukcja obsługi i ściągawka Octave CLI
 
 #### Uruchamianie skryptów `.m`
@@ -185,6 +208,7 @@ available_graphics_toolkits()
 graphics_toolkit("qt")
 ```
 
+<a id="pl-5-roznice-skladniowe-matlab-vs-gnu-octave-i-przenoszenie-kodu-przyklad-octave_dtree_platformer_v5m--p6m"></a>
 ### 5. Różnice składniowe MATLAB vs. GNU Octave i przenoszenie kodu (przykład: `octave_dtree_platformer_v5.m` / `p6.m`)
 
 Mimo wysokiej zgodności składniowej, uruchamianie tych samych plików `.m` w MATLAB-ie oraz GNU Octave wymaga stosowania kilku wzorców obronnych (zastosowanych w `octave_dtree_platformer_v5.m`):
