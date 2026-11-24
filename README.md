@@ -82,6 +82,29 @@ available_graphics_toolkits()
 graphics_toolkit("qt")
 ```
 
+### 5. MATLAB vs. GNU Octave Compatibility & Porting Guide (Example: `octave_dtree_platformer_v5.m` / `p6.m`)
+
+While GNU Octave is largely source-compatible with MATLAB, subtle differences in syntax, graphics backends, and testing frameworks require defensive patterns when writing cross-compatible `.m` files (as demonstrated in `octave_dtree_platformer_v5.m`):
+
+| Feature / Area | MATLAB | GNU Octave | Cross-Compatibility Strategy |
+| :--- | :--- | :--- | :--- |
+| **Comments & Block Endings** | `%` comments, `end` keyword | `%` or `#` comments; `endif`, `endfor`, `endfunction` | Stick strictly to `%` for comments and universal `end` keywords so MATLAB does not throw syntax errors. |
+| **String Quotes** | `'char'` vs. `"string"` (distinct types) | `'char'` and `"string"` are both char arrays | Use single quotes `'...'` for identifiers, property names, and struct fields (`'Visible'`, `'off'`). |
+| **Function Ordering** | Local functions allowed at end of scripts (R2016b+) | Functions must be declared before calls in scripts, or use a primary function file | Wrap the file in a primary top-level function (`function varargout = p6(varargin)`) so all helper subfunctions are accessible anywhere in the file. |
+| **Unit Testing** | Class-based (`matlab.unittest`) or function-based tests | Inline `%!test` blocks executed via `test <filename>` | Embed `%!test` blocks at the bottom of the file (MATLAB ignores them as comments). Expose private helpers via a dispatcher (`if strncmp(varargin{1}, '__call__', 8)`). |
+| **Graphics Toolkits (`--no-gui`)** | Native Java/HG2 rendering engine | `fltk`, `qt`, or `gnuplot` (`qt` can fail in headless CLI mode) | Probe available toolkits (`display_select_toolkit({'fltk', 'qt'})`) and guard Octave-only calls with `if exist('graphics_toolkit', 'file')`. |
+| **Argument Validation** | `arguments ... end` blocks (R2019b+) | Partial/limited support depending on Octave version | Use classic `nargin` checks (`if nargin < 1 || isempty(arg)`) for universal compatibility. |
+
+#### Running Cross-Compatible Code Across Environments
+* **In GNU Octave CLI (`--no-gui`):**
+  ```octave
+  test octave_dtree_platformer_v5         % Run embedded %!test unit tests
+  octave_dtree_platformer_v5()            % Run primary function
+  source('octave_dtree_platformer_v5.m')  % Alternative execution via source()
+  ```
+* **In MATLAB:**
+  Call the entry-point function directly from the Command Window (`octave_dtree_platformer_v5()` or `p6()`). Guard Octave-specific builtins (`graphics_toolkit`, `isguirunning`) with `exist(..., 'builtin')` / `exist(..., 'file')` so MATLAB skips them cleanly.
+
 ---
 
 <a id="-wersja-polska"></a>
@@ -144,7 +167,7 @@ system('notepad "filename.m"')
 | Polecenie | Opis | Przykład użycia |
 | :--- | :--- | :--- |
 | `pwd` | Wyświetla bieżącą ścieżkę roboczą | `pwd` |
-| `cd` | Zmienia bieżący katalog roboczy | `cd('C:/sciezka/do/folderu')` |
+| `cd` | Zmienia bieżącą ścieżkę roboczą | `cd('C:/sciezka/do/folderu')` |
 | `ls` | Wyświetla listę plików w bieżącym katalogu | `ls` |
 | `fopen` | Otwiera lub tworzy plik (`'r'`, `'w'`, `'a'`) | `fid = fopen('myfile.txt', 'w');` |
 | `fclose` | Zamyka otwarty uchwyt pliku *(wymagane do zapisu danych)* | `fclose(fid);` |
@@ -161,3 +184,26 @@ available_graphics_toolkits()
 % Przełączenie aktywnego silnika (np. na qt lub gnuplot)
 graphics_toolkit("qt")
 ```
+
+### 5. Różnice składniowe MATLAB vs. GNU Octave i przenoszenie kodu (przykład: `octave_dtree_platformer_v5.m` / `p6.m`)
+
+Mimo wysokiej zgodności składniowej, uruchamianie tych samych plików `.m` w MATLAB-ie oraz GNU Octave wymaga stosowania kilku wzorców obronnych (zastosowanych w `octave_dtree_platformer_v5.m`):
+
+| Obszar / Cecha | MATLAB | GNU Octave | Strategia pełnej kompatybilności |
+| :--- | :--- | :--- | :--- |
+| **Komentarze i zamykanie bloków** | Komentarze `%`, słowo kluczowe `end` | Komentarze `%` lub `#`; bloki `endif`, `endfor`, `endfunction` | Stosuj wyłącznie `%` do komentarzy oraz uniwersalne `end` do zamykania bloków (konstrukcje `#` i `endif` powodują błędy w MATLAB-ie). |
+| **Cudzysłowy i ciągi znaków** | `'char'` (tablica znaków) vs. `"string"` (obiekt) | `'...'` oraz `"..."` traktowane są jako tablice `char` | Używaj pojedynczych apostrofów `'...'` dla nazw właściwości, kluczy i parametrów (`'Visible'`, `'off'`). |
+| **Kolejność funkcji w pliku** | Funkcje lokalne mogą być na końcu skryptu | W skryptach funkcja musi być zdefiniowana przed jej wywołaniem | Zdefiniuj główną funkcję na samej górze pliku (`function varargout = p6(varargin)`), dzięki czemu wszystkie funkcje pomocnicze są widoczne w całym pliku. |
+| **Testy jednostkowe** | Framework `matlab.unittest` lub testy funkcyjne | Bloki `%!test` uruchamiane poleceniem `test <nazwa_pliku>` | Umieszczaj testy w blokach `%!test` na końcu pliku (MATLAB traktuje je jako zwykłe komentarze). W Octave udostępnij funkcje prywatne przez dispatcher (`if strncmp(varargin{1}, '__call__', 8)`). |
+| **Silniki graficzne (`--no-gui`)** | Wbudowany silnik graficzny HG2 | Backendy `fltk`, `qt`, `gnuplot` (`qt` bywa niestabilny bez GUI) | Wykrywaj i testuj dostępny silnik przed utworzeniem okna (`display_select_toolkit({'fltk', 'qt'})`), a dla MATLAB-a zabezpiecz wywołania funkcją `exist('graphics_toolkit', 'file')`. |
+| **Walidacja argumentów** | Bloki `arguments ... end` (od R2019b) | Ograniczone wsparcie w starszych wersjach Octave | Stosuj klasyczne sprawdzanie `nargin` (`if nargin < 1 || isempty(arg)`), które działa identycznie w obu środowiskach. |
+
+#### Jak uruchamiać kod między środowiskami?
+* **W GNU Octave CLI (`--no-gui`):**
+  ```octave
+  test octave_dtree_platformer_v5         % Uruchomienie testów %!test
+  octave_dtree_platformer_v5()            % Wywołanie funkcji głównej
+  source('octave_dtree_platformer_v5.m')  % Uruchomienie przez source()
+  ```
+* **W MATLAB:**
+  Wywołaj funkcję główną bezpośrednio w *Command Window* (`octave_dtree_platformer_v5()` lub `p6()`). Funkcje specyficzne dla GNU Octave (`graphics_toolkit`, `isguirunning`) warto owinąć warunkiem `if exist('isguirunning', 'builtin')`, aby MATLAB bezpiecznie je pomijał.
